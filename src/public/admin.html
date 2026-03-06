@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WhatsApp Lead Admin - Ethinos</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; }
+
+    .header { background: #25D366; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
+    .header h1 { font-size: 24px; }
+
+    .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
+
+    .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; margin-bottom: 30px; }
+    .stat-card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+    .stat-card h3 { color: #666; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; }
+    .stat-card .value { font-size: 28px; font-weight: bold; color: #333; }
+    .stat-card.green .value { color: #25D366; }
+    .stat-card.blue .value { color: #0084ff; }
+    .stat-card.orange .value { color: #ff9800; }
+    .stat-card.purple .value { color: #9c27b0; }
+
+    .controls { display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap; }
+    .controls input, .controls select { padding: 10px 15px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px; }
+    .controls input { flex: 1; min-width: 200px; }
+    .controls select { min-width: 140px; }
+
+    .leads-table { background: white; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 900px; }
+    th, td { padding: 12px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 13px; }
+    th { background: #f9f9f9; font-weight: 600; color: #666; white-space: nowrap; }
+    tr:hover { background: #f5f5f5; }
+
+    .status, .inquiry-type { padding: 4px 10px; border-radius: 20px; font-size: 11px; font-weight: 500; white-space: nowrap; }
+    .status.new { background: #e3f2fd; color: #1976d2; }
+    .status.in_progress { background: #fff3e0; color: #f57c00; }
+    .status.completed { background: #e8f5e9; color: #388e3c; }
+    .status.contacted { background: #f3e5f5; color: #7b1fa2; }
+
+    .inquiry-type.service { background: #e8f5e9; color: #388e3c; }
+    .inquiry-type.job { background: #fff3e0; color: #f57c00; }
+    .inquiry-type.networking { background: #e3f2fd; color: #1976d2; }
+    .inquiry-type.event { background: #fce4ec; color: #c2185b; }
+    .inquiry-type.general { background: #f5f5f5; color: #666; }
+
+    .actions button { padding: 6px 10px; margin-right: 3px; border: none; border-radius: 5px; cursor: pointer; font-size: 11px; }
+    .btn-view { background: #e3f2fd; color: #1976d2; }
+    .btn-delete { background: #ffebee; color: #c62828; }
+
+    .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
+    .modal.active { display: flex; justify-content: center; align-items: center; }
+    .modal-content { background: white; padding: 25px; border-radius: 15px; max-width: 700px; width: 95%; max-height: 85vh; overflow-y: auto; }
+    .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+    .modal-header h2 { font-size: 20px; }
+    .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
+
+    .lead-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px; }
+    .lead-info .field { padding: 10px; background: #f9f9f9; border-radius: 8px; }
+    .lead-info .field label { font-size: 11px; color: #666; text-transform: uppercase; display: block; margin-bottom: 4px; }
+    .lead-info .field .value { font-size: 14px; color: #333; font-weight: 500; }
+
+    .conversation { max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: #fafafa; }
+    .message { margin-bottom: 12px; }
+    .message.user { text-align: right; }
+    .message .bubble { display: inline-block; padding: 10px 14px; border-radius: 15px; max-width: 80%; font-size: 13px; }
+    .message.user .bubble { background: #25D366; color: white; border-bottom-right-radius: 5px; }
+    .message.assistant .bubble { background: #e5e5ea; color: #333; border-bottom-left-radius: 5px; }
+    .message .time { font-size: 10px; color: #999; margin-top: 3px; }
+
+    .message-form { display: flex; gap: 10px; margin-bottom: 15px; }
+    .message-form input { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 25px; }
+    .message-form button { padding: 12px 20px; background: #25D366; color: white; border: none; border-radius: 25px; cursor: pointer; font-weight: 500; }
+
+    .modal-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    .modal-actions select { padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
+    .modal-actions label { font-size: 13px; color: #666; }
+
+    @media (max-width: 768px) {
+      .controls { flex-direction: column; }
+      .controls input, .controls select { width: 100%; }
+      .lead-info { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Ethinos - Lead Dashboard</h1>
+    <span id="refresh-time">Last updated: --</span>
+  </div>
+
+  <div class="container">
+    <div class="stats">
+      <div class="stat-card">
+        <h3>Total Leads</h3>
+        <div class="value" id="stat-total">0</div>
+      </div>
+      <div class="stat-card green">
+        <h3>Service Inquiries</h3>
+        <div class="value" id="stat-service">0</div>
+      </div>
+      <div class="stat-card orange">
+        <h3>Job Applications</h3>
+        <div class="value" id="stat-job">0</div>
+      </div>
+      <div class="stat-card blue">
+        <h3>Networking</h3>
+        <div class="value" id="stat-networking">0</div>
+      </div>
+      <div class="stat-card purple">
+        <h3>Event Contacts</h3>
+        <div class="value" id="stat-event">0</div>
+      </div>
+      <div class="stat-card">
+        <h3>Today</h3>
+        <div class="value" id="stat-today">0</div>
+      </div>
+    </div>
+
+    <div class="controls">
+      <input type="text" id="search" placeholder="Search by name, email, company, phone...">
+      <select id="type-filter">
+        <option value="all">All Types</option>
+        <option value="service">Service</option>
+        <option value="job">Job</option>
+        <option value="networking">Networking</option>
+        <option value="event">Event</option>
+        <option value="general">General</option>
+      </select>
+      <select id="status-filter">
+        <option value="all">All Status</option>
+        <option value="new">New</option>
+        <option value="in_progress">In Progress</option>
+        <option value="completed">Completed</option>
+        <option value="contacted">Contacted</option>
+      </select>
+    </div>
+
+    <div class="leads-table">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Company</th>
+            <th>Interest/Role</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="leads-body">
+          <tr><td colspan="9" style="text-align: center; padding: 40px;">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Lead Detail Modal -->
+  <div class="modal" id="lead-modal">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2>Lead Details <span id="lead-type-badge"></span></h2>
+        <button class="close-btn" onclick="closeModal()">&times;</button>
+      </div>
+
+      <div class="lead-info" id="lead-details"></div>
+
+      <h4 style="margin-bottom: 10px; color: #666;">Conversation</h4>
+      <div class="conversation" id="conversation"></div>
+
+      <div class="message-form">
+        <input type="text" id="message-input" placeholder="Send a WhatsApp message...">
+        <button onclick="sendMessage()">Send</button>
+      </div>
+
+      <div class="modal-actions">
+        <label>Status:</label>
+        <select id="status-update" onchange="updateStatus()">
+          <option value="new">New</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="contacted">Contacted</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentLeadId = null;
+    let allLeads = [];
+
+    async function loadStats() {
+      const res = await fetch('/api/leads');
+      allLeads = await res.json();
+
+      document.getElementById('stat-total').textContent = allLeads.length;
+      document.getElementById('stat-service').textContent = allLeads.filter(l => l.inquiryType === 'service').length;
+      document.getElementById('stat-job').textContent = allLeads.filter(l => l.inquiryType === 'job').length;
+      document.getElementById('stat-networking').textContent = allLeads.filter(l => l.inquiryType === 'networking').length;
+      document.getElementById('stat-event').textContent = allLeads.filter(l => l.inquiryType === 'event').length;
+
+      const today = new Date().toDateString();
+      document.getElementById('stat-today').textContent = allLeads.filter(l => new Date(l.createdAt).toDateString() === today).length;
+    }
+
+    async function loadLeads() {
+      const search = document.getElementById('search').value.toLowerCase();
+      const typeFilter = document.getElementById('type-filter').value;
+      const statusFilter = document.getElementById('status-filter').value;
+
+      let filtered = allLeads;
+
+      if (search) {
+        filtered = filtered.filter(l =>
+          (l.name || '').toLowerCase().includes(search) ||
+          (l.email || '').toLowerCase().includes(search) ||
+          (l.company || '').toLowerCase().includes(search) ||
+          (l.phoneNumber || '').includes(search)
+        );
+      }
+
+      if (typeFilter !== 'all') {
+        filtered = filtered.filter(l => l.inquiryType === typeFilter);
+      }
+
+      if (statusFilter !== 'all') {
+        filtered = filtered.filter(l => l.status === statusFilter);
+      }
+
+      const tbody = document.getElementById('leads-body');
+
+      if (filtered.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;">No leads found</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = filtered.map(lead => `
+        <tr>
+          <td><span class="inquiry-type ${lead.inquiryType || 'general'}">${lead.inquiryType || 'general'}</span></td>
+          <td>${lead.name || lead.whatsappName || '-'}</td>
+          <td>${lead.phoneNumber}</td>
+          <td>${lead.email || '-'}</td>
+          <td>${lead.company || '-'}</td>
+          <td>${lead.service || lead.jobRole || lead.personToConnect || '-'}</td>
+          <td><span class="status ${lead.status}">${(lead.status || '').replace('_', ' ')}</span></td>
+          <td>${new Date(lead.createdAt).toLocaleDateString()}</td>
+          <td class="actions">
+            <button class="btn-view" onclick="viewLead('${lead.id}')">View</button>
+            <button class="btn-delete" onclick="deleteLead('${lead.id}')">Del</button>
+          </td>
+        </tr>
+      `).join('');
+
+      document.getElementById('refresh-time').textContent = 'Updated: ' + new Date().toLocaleTimeString();
+    }
+
+    async function viewLead(id) {
+      currentLeadId = id;
+      const res = await fetch('/api/leads/' + id);
+      const lead = await res.json();
+
+      document.getElementById('lead-type-badge').innerHTML = `<span class="inquiry-type ${lead.inquiryType || 'general'}">${lead.inquiryType || 'general'}</span>`;
+
+      let detailsHtml = `
+        <div class="field"><label>Name</label><div class="value">${lead.name || lead.whatsappName || '-'}</div></div>
+        <div class="field"><label>Phone</label><div class="value">${lead.phoneNumber}</div></div>
+        <div class="field"><label>Email</label><div class="value">${lead.email || '-'}</div></div>
+        <div class="field"><label>Company</label><div class="value">${lead.company || '-'}</div></div>
+        <div class="field"><label>Designation</label><div class="value">${lead.designation || '-'}</div></div>
+      `;
+
+      if (lead.inquiryType === 'service') {
+        detailsHtml += `
+          <div class="field"><label>Service</label><div class="value">${lead.service || '-'}</div></div>
+          <div class="field"><label>Budget</label><div class="value">${lead.budget || '-'}</div></div>
+          <div class="field"><label>Timeline</label><div class="value">${lead.timeline || '-'}</div></div>
+        `;
+      } else if (lead.inquiryType === 'job') {
+        detailsHtml += `
+          <div class="field"><label>Job Role</label><div class="value">${lead.jobRole || '-'}</div></div>
+          <div class="field"><label>Experience</label><div class="value">${lead.experience || '-'}</div></div>
+          <div class="field"><label>Resume</label><div class="value">${lead.resumeLink ? `<a href="${lead.resumeLink}" target="_blank" style="color:#25D366;">📎 Download Resume</a>` : '-'}</div></div>
+        `;
+      } else if (lead.inquiryType === 'networking') {
+        detailsHtml += `
+          <div class="field"><label>Connect With</label><div class="value">${lead.personToConnect || '-'}</div></div>
+        `;
+      } else if (lead.inquiryType === 'event') {
+        detailsHtml += `
+          <div class="field"><label>Event</label><div class="value">${lead.eventName || '-'}</div></div>
+        `;
+      }
+
+      if (lead.notes) {
+        detailsHtml += `<div class="field" style="grid-column: 1/-1;"><label>Notes</label><div class="value">${lead.notes}</div></div>`;
+      }
+
+      // Show all attachments
+      if (lead.attachments && lead.attachments.length > 0) {
+        detailsHtml += `<div class="field" style="grid-column: 1/-1;"><label>📎 Attachments (${lead.attachments.length})</label><div class="value">`;
+        lead.attachments.forEach(att => {
+          const icon = att.type === 'document' ? '📄' : (att.type === 'image' ? '🖼️' : '📁');
+          detailsHtml += `<a href="${att.localPath}" target="_blank" style="display:inline-block; margin:5px 10px 5px 0; padding:8px 12px; background:#e8f5e9; border-radius:8px; color:#388e3c; text-decoration:none;">${icon} ${att.fileName || 'Download'}</a>`;
+        });
+        detailsHtml += `</div></div>`;
+      }
+
+      document.getElementById('lead-details').innerHTML = detailsHtml;
+
+      const history = lead.conversationHistory || [];
+      document.getElementById('conversation').innerHTML = history.map(msg => `
+        <div class="message ${msg.role}">
+          <div class="bubble">${msg.content}</div>
+          <div class="time">${new Date(msg.timestamp).toLocaleString()}</div>
+        </div>
+      `).join('') || '<p style="color:#999; text-align:center;">No messages yet</p>';
+
+      document.getElementById('status-update').value = lead.status;
+      document.getElementById('lead-modal').classList.add('active');
+
+      // Scroll conversation to bottom
+      const conv = document.getElementById('conversation');
+      conv.scrollTop = conv.scrollHeight;
+    }
+
+    function closeModal() {
+      document.getElementById('lead-modal').classList.remove('active');
+      currentLeadId = null;
+    }
+
+    async function sendMessage() {
+      const input = document.getElementById('message-input');
+      const message = input.value.trim();
+      if (!message || !currentLeadId) return;
+
+      try {
+        await fetch('/api/leads/' + currentLeadId + '/message', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message })
+        });
+        input.value = '';
+        await loadStats();
+        viewLead(currentLeadId);
+      } catch (e) {
+        alert('Failed to send message');
+      }
+    }
+
+    async function updateStatus() {
+      const status = document.getElementById('status-update').value;
+      await fetch('/api/leads/' + currentLeadId, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status })
+      });
+      await loadStats();
+      loadLeads();
+    }
+
+    async function deleteLead(id) {
+      if (!confirm('Delete this lead?')) return;
+      await fetch('/api/leads/' + id, { method: 'DELETE' });
+      await loadStats();
+      loadLeads();
+    }
+
+    // Event listeners
+    document.getElementById('search').addEventListener('input', debounce(loadLeads, 300));
+    document.getElementById('type-filter').addEventListener('change', loadLeads);
+    document.getElementById('status-filter').addEventListener('change', loadLeads);
+    document.getElementById('message-input').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') sendMessage();
+    });
+
+    function debounce(func, wait) {
+      let timeout;
+      return function(...args) {
+        clearTimeout(timeout);
+        timeout = setTimeout(() => func.apply(this, args), wait);
+      };
+    }
+
+    // Initial load
+    loadStats().then(loadLeads);
+
+    // Auto refresh every 30 seconds
+    setInterval(() => {
+      loadStats().then(loadLeads);
+    }, 30000);
+  </script>
+</body>
+</html>
