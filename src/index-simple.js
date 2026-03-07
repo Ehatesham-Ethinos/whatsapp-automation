@@ -72,8 +72,8 @@ const Lead = sequelize.define('Lead', {
   timestamps: true
 });
 
-// Sync database
-sequelize.sync().then(() => {
+// Sync database (alter: true adds new columns without dropping data)
+sequelize.sync({ alter: true }).then(() => {
   console.log('PostgreSQL connected & synced');
 }).catch(err => {
   console.error('Database error:', err);
