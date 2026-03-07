@@ -308,15 +308,19 @@
       } else if (lead.inquiryType === 'job') {
         detailsHtml += `
           <div class="field"><label>Job Role</label><div class="value">${lead.jobRole || '-'}</div></div>
-          <div class="field"><label>Experience</label><div class="value">${lead.experience || '-'}</div></div>
+          <div class="field"><label>Total Experience</label><div class="value">${lead.totalExperience || lead.experience || '-'}</div></div>
+          <div class="field"><label>Relevant Experience</label><div class="value">${lead.relevantExperience || '-'}</div></div>
+          <div class="field"><label>Current CTC</label><div class="value">${lead.currentCTC || '-'}</div></div>
+          <div class="field"><label>Expected CTC</label><div class="value">${lead.expectedCTC || '-'}</div></div>
+          <div class="field"><label>Notice Period</label><div class="value">${lead.noticePeriod || '-'}</div></div>
           <div class="field"><label>Resume</label><div class="value">${lead.resumeLink ? `<a href="${lead.resumeLink}" target="_blank" style="color:#25D366;">Download Resume</a>` : '-'}</div></div>
         `;
 
-        // Show assessment answers
-        if (lead.assessmentAnswers && lead.assessmentAnswers.length > 0) {
+        // Show assessment Q&A
+        if (lead.assessmentQA && lead.assessmentQA.length > 0) {
           detailsHtml += `<div class="field full-width"><label>Skill Assessment</label><div class="assessment-answers">`;
-          lead.assessmentAnswers.forEach((answer, idx) => {
-            detailsHtml += `<div class="qa"><div class="q">Q${idx + 1}</div><div class="a">${answer}</div></div>`;
+          lead.assessmentQA.forEach((qa, idx) => {
+            detailsHtml += `<div class="qa"><div class="q">Q${idx + 1}: ${qa.q || 'Question'}</div><div class="a">${qa.a || '-'}</div></div>`;
           });
           detailsHtml += `</div></div>`;
         }
@@ -417,35 +421,44 @@
       const headers = [
         'Type', 'Name', 'WhatsApp Name', 'Phone', 'Email', 'Company', 'Designation', 'Website',
         'Service', 'Challenge', 'Competitor', 'Past Experience', 'Goals', 'Budget', 'Timeline',
-        'Job Role', 'Experience (Years)', 'Assessment Answers',
+        'Job Role', 'Total Experience', 'Relevant Experience', 'Current CTC', 'Expected CTC', 'Notice Period', 'Assessment Q&A',
         'Event Name', 'Person to Connect', 'Notes', 'Status', 'Created At'
       ];
 
-      const rows = filtered.map(lead => [
-        lead.inquiryType || '',
-        lead.name || '',
-        lead.whatsappName || '',
-        lead.phoneNumber || '',
-        lead.email || '',
-        lead.company || '',
-        lead.designation || '',
-        lead.website || '',
-        lead.service || '',
-        lead.challenge || '',
-        lead.competitor || '',
-        lead.pastExperience || '',
-        lead.goals || '',
-        lead.budget || '',
-        lead.timeline || '',
-        lead.jobRole || '',
-        lead.experience || '',
-        (lead.assessmentAnswers || []).join(' | '),
-        lead.eventName || '',
-        lead.personToConnect || '',
-        lead.notes || '',
-        lead.status || '',
-        lead.createdAt ? new Date(lead.createdAt).toLocaleString() : ''
-      ]);
+      const rows = filtered.map(lead => {
+        // Format assessment Q&A
+        const qaStr = (lead.assessmentQA || []).map(qa => `Q: ${qa.q || ''} A: ${qa.a || ''}`).join(' || ');
+
+        return [
+          lead.inquiryType || '',
+          lead.name || '',
+          lead.whatsappName || '',
+          lead.phoneNumber || '',
+          lead.email || '',
+          lead.company || '',
+          lead.designation || '',
+          lead.website || '',
+          lead.service || '',
+          lead.challenge || '',
+          lead.competitor || '',
+          lead.pastExperience || '',
+          lead.goals || '',
+          lead.budget || '',
+          lead.timeline || '',
+          lead.jobRole || '',
+          lead.totalExperience || lead.experience || '',
+          lead.relevantExperience || '',
+          lead.currentCTC || '',
+          lead.expectedCTC || '',
+          lead.noticePeriod || '',
+          qaStr,
+          lead.eventName || '',
+          lead.personToConnect || '',
+          lead.notes || '',
+          lead.status || '',
+          lead.createdAt ? new Date(lead.createdAt).toLocaleString() : ''
+        ];
+      });
 
       // Create CSV content
       const csvContent = [headers, ...rows]

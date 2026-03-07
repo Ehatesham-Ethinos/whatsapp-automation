@@ -59,7 +59,12 @@ const Lead = sequelize.define('Lead', {
   personToConnect: DataTypes.STRING,
   jobRole: DataTypes.STRING,
   experience: DataTypes.STRING,
-  assessmentAnswers: { type: DataTypes.JSON, defaultValue: [] }, // Skill assessment Q&A
+  totalExperience: DataTypes.STRING,
+  relevantExperience: DataTypes.STRING,
+  currentCTC: DataTypes.STRING,
+  expectedCTC: DataTypes.STRING,
+  noticePeriod: DataTypes.STRING,
+  assessmentQA: { type: DataTypes.JSON, defaultValue: [] }, // [{q: "question", a: "answer"}]
   resumeLink: DataTypes.STRING,
   resumeFileName: DataTypes.STRING,
   resumeMediaId: DataTypes.STRING,
@@ -102,7 +107,7 @@ Make it conversational, gather intel naturally:
 1. "Nice! What's your brand/business called?"
 2. "Drop your website link - I'll take a quick look" (get URL)
 3. "What's the main challenge right now? Traffic? Leads? Sales? Brand awareness?"
-4. "Who's your biggest competitor? (I'm curious 👀)"
+4. "Who's your biggest competitor? (I'm curious)"
 5. "What have you tried so far? Any past agency experience?"
 6. "What does winning look like for you? Any specific goals or numbers?"
 7. "Ballpark budget range? (helps us recommend the right approach)"
@@ -112,47 +117,44 @@ Make it conversational, gather intel naturally:
 Keep it natural - don't fire all questions at once. React to their answers!
 
 ═══════════════════════════════════════
-💼 JOB INQUIRY FLOW (Quick Assessment)
+💼 JOB INQUIRY FLOW (Complete Assessment)
 ═══════════════════════════════════════
-Make it fun - like a quick vibe check:
+Follow this EXACT order. Ask ONE question at a time:
 
-1. "Awesome, we're always scouting talent! What role catches your eye?"
-2. "How many years in the game?"
-3. Then do a QUICK 3-question skill check based on role:
+STEP 1 - Basic Info:
+1. "Awesome, we're always scouting talent! What role are you looking for?"
+2. "How many years of total experience do you have?"
+3. "And how many years specifically in [their role]?" (relevant experience)
 
-For SOCIAL MEDIA roles:
-- "Quick fire: A brand's Instagram engagement dropped 40% this month. First thing you'd check?"
-- "Reels or Carousels - which gets more reach right now and why?"
-- "A client wants to go viral. What do you tell them?"
+STEP 2 - HR Questions:
+4. "What's your current CTC? (annual package)"
+5. "And what's your expected CTC?"
+6. "What's your notice period? Can you negotiate it?"
 
-For SEO roles:
+STEP 3 - Quick Skill Assessment (1-2 questions based on role):
+
+For SOCIAL MEDIA:
+- "Quick one: A brand's Instagram engagement dropped 40%. First thing you'd check?"
+
+For SEO:
 - "Site traffic dropped after a Google update. What's your first move?"
-- "On-page vs Off-page - which moves the needle faster for a new site?"
-- "How would you explain E-E-A-T to a client who's never heard of it?"
 
-For PPC/PAID ADS roles:
+For PPC/PAID ADS:
 - "CPL is too high on a lead gen campaign. What do you optimize first?"
-- "Search vs Performance Max - when would you use each?"
-- "Client wants leads but has ₹30k/month budget. What's your play?"
 
-For CONTENT roles:
+For CONTENT:
 - "How do you make a boring B2B topic interesting?"
-- "SEO content vs viral content - can they be the same piece?"
-- "Give me a hook for an article about 'digital marketing trends'"
 
-For DESIGN roles:
-- "Scroll-stopping creative - what makes it work?"
-- "Client says 'make the logo bigger'. How do you handle it?"
-- "Static vs motion - when do you pick which?"
+For DESIGN:
+- "What makes a scroll-stopping creative?"
 
-For OTHER/GENERAL:
+For OTHER roles:
 - "What's a marketing campaign you've seen recently that impressed you?"
-- "What's your superpower at work?"
-- "Why Ethinos? What caught your attention?"
 
-4. "Nice answers! Drop your resume here (PDF/DOC)"
-5. "And your email so HR can reach you?"
-6. "You're all set! Our team will review and ping you soon. Keep creating! 🚀"
+STEP 4 - Final:
+7. "Nice! Drop your resume here (PDF/DOC works)"
+8. "And your email so HR can reach you?"
+9. "You're all set! Our team will review and get back to you soon."
 
 ═══════════════════════════════════════
 🤝 NETWORKING FLOW
@@ -161,7 +163,7 @@ For OTHER/GENERAL:
 2. "What's this regarding? (Just so I can give them context)"
 3. "Your name and company?"
 4. "Best email to connect you on?"
-5. "Got it! I'll pass this along - expect a ping soon 🤙"
+5. "Got it! I'll pass this along - expect a ping soon"
 
 ═══════════════════════════════════════
 🎪 EVENT CONTACT FLOW
@@ -170,7 +172,7 @@ For OTHER/GENERAL:
 2. "What caught your interest - our services or career stuff?"
 3. Then flow into SERVICE or JOB flow based on answer
 4. Get: name, email, company
-5. "Great meeting you! Someone from our team will follow up 🙌"
+5. "Great meeting you! Someone from our team will follow up"
 
 ═══════════════════════════════════════
 TONE & STYLE
@@ -178,17 +180,14 @@ TONE & STYLE
 - Sound human, not corporate
 - Short punchy messages (2-3 lines max)
 - Use casual language: "Nice!", "Got it", "Cool", "Awesome"
-- ONE question at a time
+- ONE question at a time - NEVER ask multiple questions
 - React to their answers before asking next question
-- Light emoji use is fine 👍
 - No "I'd be happy to help" or "Could you please share"
-- Instead: "What's your email?" not "Could you please provide your email address?"
 
 ABOUT ETHINOS:
 - Full-stack digital marketing agency
 - SEO, Social, Paid Ads, Content, Web Dev, Branding
 - Based in India, working with global brands
-- Always hunting for sharp talent
 
 IMPORTANT: After EVERY response, output this JSON block:
 <LEAD_DATA>{
@@ -208,8 +207,12 @@ IMPORTANT: After EVERY response, output this JSON block:
   "eventName": "value or null",
   "personToConnect": "value or null",
   "jobRole": "value or null",
-  "experience": "years of experience or null",
-  "assessmentAnswers": "array of their skill assessment answers or null",
+  "totalExperience": "total years of experience or null",
+  "relevantExperience": "years in specific role or null",
+  "currentCTC": "current salary/package or null",
+  "expectedCTC": "expected salary/package or null",
+  "noticePeriod": "notice period or null",
+  "assessmentQA": [{"q": "question asked", "a": "their answer"}],
   "resumeLink": "value or null",
   "notes": "any additional context or null"
 }</LEAD_DATA>
@@ -419,9 +422,14 @@ app.post('/webhook', async (req, res) => {
     if (leadData.personToConnect) updates.personToConnect = leadData.personToConnect;
     if (leadData.jobRole) updates.jobRole = leadData.jobRole;
     if (leadData.experience) updates.experience = leadData.experience;
-    if (leadData.assessmentAnswers) {
-      const existing = lead.assessmentAnswers || [];
-      updates.assessmentAnswers = [...existing, ...leadData.assessmentAnswers];
+    if (leadData.totalExperience) updates.totalExperience = leadData.totalExperience;
+    if (leadData.relevantExperience) updates.relevantExperience = leadData.relevantExperience;
+    if (leadData.currentCTC) updates.currentCTC = leadData.currentCTC;
+    if (leadData.expectedCTC) updates.expectedCTC = leadData.expectedCTC;
+    if (leadData.noticePeriod) updates.noticePeriod = leadData.noticePeriod;
+    if (leadData.assessmentQA && leadData.assessmentQA.length > 0) {
+      const existing = lead.assessmentQA || [];
+      updates.assessmentQA = [...existing, ...leadData.assessmentQA];
     }
     if (leadData.resumeLink) updates.resumeLink = leadData.resumeLink;
     if (leadData.notes) updates.notes = leadData.notes;
@@ -470,8 +478,8 @@ app.post('/webhook', async (req, res) => {
 
 async function getAIResponse(lead, history) {
   try {
-    const assessmentStr = lead.assessmentAnswers?.length
-      ? lead.assessmentAnswers.map((a, i) => `Q${i+1}: ${a}`).join(', ')
+    const assessmentStr = lead.assessmentQA?.length
+      ? lead.assessmentQA.map((qa, i) => `Q${i+1}: ${qa.q} -> A: ${qa.a}`).join(' | ')
       : 'none yet';
 
     const leadContext = `Current lead data:
@@ -491,8 +499,12 @@ async function getAIResponse(lead, history) {
 - Event: ${lead.eventName || 'unknown'}
 - Person to Connect: ${lead.personToConnect || 'unknown'}
 - Job Role: ${lead.jobRole || 'unknown'}
-- Years Experience: ${lead.experience || 'unknown'}
-- Assessment Answers: ${assessmentStr}
+- Total Experience: ${lead.totalExperience || 'unknown'}
+- Relevant Experience: ${lead.relevantExperience || 'unknown'}
+- Current CTC: ${lead.currentCTC || 'unknown'}
+- Expected CTC: ${lead.expectedCTC || 'unknown'}
+- Notice Period: ${lead.noticePeriod || 'unknown'}
+- Assessment Q&A: ${assessmentStr}
 - Resume: ${lead.resumeLink ? 'uploaded' : 'not uploaded'}`;
 
     const completion = await openai.chat.completions.create({
