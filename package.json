@@ -2,10 +2,10 @@
   "name": "whatsapp-lead-automation",
   "version": "1.0.0",
   "description": "WhatsApp automation for lead generation using Meta Cloud API and AI",
-  "main": "src/index.js",
+  "main": "src/index-simple.js",
   "scripts": {
-    "start": "node src/index.js",
-    "dev": "nodemon src/index.js"
+    "start": "node src/index-simple.js",
+    "dev": "nodemon src/index-simple.js"
   },
   "keywords": [
     "whatsapp",
