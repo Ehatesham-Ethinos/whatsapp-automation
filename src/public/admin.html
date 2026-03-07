@@ -10,6 +10,11 @@
 
     .header { background: #25D366; color: white; padding: 20px; display: flex; justify-content: space-between; align-items: center; }
     .header h1 { font-size: 24px; }
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+    .header-actions span { font-size: 13px; opacity: 0.9; }
+
+    .btn-export { background: white; color: #25D366; border: none; padding: 10px 20px; border-radius: 25px; font-weight: 600; cursor: pointer; font-size: 13px; }
+    .btn-export:hover { background: #f0f0f0; }
 
     .container { max-width: 1400px; margin: 0 auto; padding: 20px; }
 
@@ -51,7 +56,7 @@
 
     .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; }
     .modal.active { display: flex; justify-content: center; align-items: center; }
-    .modal-content { background: white; padding: 25px; border-radius: 15px; max-width: 700px; width: 95%; max-height: 85vh; overflow-y: auto; }
+    .modal-content { background: white; padding: 25px; border-radius: 15px; max-width: 800px; width: 95%; max-height: 85vh; overflow-y: auto; }
     .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
     .modal-header h2 { font-size: 20px; }
     .close-btn { background: none; border: none; font-size: 24px; cursor: pointer; color: #666; }
@@ -59,7 +64,10 @@
     .lead-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 20px; }
     .lead-info .field { padding: 10px; background: #f9f9f9; border-radius: 8px; }
     .lead-info .field label { font-size: 11px; color: #666; text-transform: uppercase; display: block; margin-bottom: 4px; }
-    .lead-info .field .value { font-size: 14px; color: #333; font-weight: 500; }
+    .lead-info .field .value { font-size: 14px; color: #333; font-weight: 500; word-break: break-word; }
+    .lead-info .field.full-width { grid-column: 1 / -1; }
+
+    .section-title { font-size: 14px; font-weight: 600; color: #333; margin: 20px 0 10px; padding-bottom: 5px; border-bottom: 2px solid #25D366; }
 
     .conversation { max-height: 250px; overflow-y: auto; border: 1px solid #eee; border-radius: 10px; padding: 15px; margin-bottom: 15px; background: #fafafa; }
     .message { margin-bottom: 12px; }
@@ -77,17 +85,27 @@
     .modal-actions select { padding: 10px; border: 1px solid #ddd; border-radius: 5px; }
     .modal-actions label { font-size: 13px; color: #666; }
 
+    .assessment-answers { background: #fff3e0; padding: 12px; border-radius: 8px; margin-top: 5px; }
+    .assessment-answers .qa { margin-bottom: 8px; padding-bottom: 8px; border-bottom: 1px solid #ffe0b2; }
+    .assessment-answers .qa:last-child { margin-bottom: 0; border-bottom: none; }
+    .assessment-answers .q { font-size: 12px; color: #e65100; font-weight: 500; }
+    .assessment-answers .a { font-size: 13px; color: #333; margin-top: 3px; }
+
     @media (max-width: 768px) {
       .controls { flex-direction: column; }
       .controls input, .controls select { width: 100%; }
       .lead-info { grid-template-columns: 1fr; }
+      .header { flex-direction: column; gap: 10px; }
     }
   </style>
 </head>
 <body>
   <div class="header">
     <h1>Ethinos - Lead Dashboard</h1>
-    <span id="refresh-time">Last updated: --</span>
+    <div class="header-actions">
+      <span id="refresh-time">Last updated: --</span>
+      <button class="btn-export" onclick="exportToExcel()">Export Excel</button>
+    </div>
   </div>
 
   <div class="container">
@@ -146,6 +164,7 @@
             <th>Phone</th>
             <th>Email</th>
             <th>Company</th>
+            <th>Website</th>
             <th>Interest/Role</th>
             <th>Status</th>
             <th>Date</th>
@@ -153,7 +172,7 @@
           </tr>
         </thead>
         <tbody id="leads-body">
-          <tr><td colspan="9" style="text-align: center; padding: 40px;">Loading...</td></tr>
+          <tr><td colspan="10" style="text-align: center; padding: 40px;">Loading...</td></tr>
         </tbody>
       </table>
     </div>
@@ -169,7 +188,7 @@
 
       <div class="lead-info" id="lead-details"></div>
 
-      <h4 style="margin-bottom: 10px; color: #666;">Conversation</h4>
+      <h4 class="section-title">Conversation</h4>
       <div class="conversation" id="conversation"></div>
 
       <div class="message-form">
@@ -219,7 +238,8 @@
           (l.name || '').toLowerCase().includes(search) ||
           (l.email || '').toLowerCase().includes(search) ||
           (l.company || '').toLowerCase().includes(search) ||
-          (l.phoneNumber || '').includes(search)
+          (l.phoneNumber || '').includes(search) ||
+          (l.website || '').toLowerCase().includes(search)
         );
       }
 
@@ -234,7 +254,7 @@
       const tbody = document.getElementById('leads-body');
 
       if (filtered.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px;">No leads found</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="10" style="text-align: center; padding: 40px;">No leads found</td></tr>';
         return;
       }
 
@@ -245,6 +265,7 @@
           <td>${lead.phoneNumber}</td>
           <td>${lead.email || '-'}</td>
           <td>${lead.company || '-'}</td>
+          <td>${lead.website ? `<a href="${lead.website.startsWith('http') ? lead.website : 'https://' + lead.website}" target="_blank" style="color:#1976d2;">${lead.website.substring(0,25)}${lead.website.length > 25 ? '...' : ''}</a>` : '-'}</td>
           <td>${lead.service || lead.jobRole || lead.personToConnect || '-'}</td>
           <td><span class="status ${lead.status}">${(lead.status || '').replace('_', ' ')}</span></td>
           <td>${new Date(lead.createdAt).toLocaleDateString()}</td>
@@ -271,20 +292,34 @@
         <div class="field"><label>Email</label><div class="value">${lead.email || '-'}</div></div>
         <div class="field"><label>Company</label><div class="value">${lead.company || '-'}</div></div>
         <div class="field"><label>Designation</label><div class="value">${lead.designation || '-'}</div></div>
+        <div class="field"><label>Website</label><div class="value">${lead.website ? `<a href="${lead.website.startsWith('http') ? lead.website : 'https://' + lead.website}" target="_blank" style="color:#25D366;">${lead.website}</a>` : '-'}</div></div>
       `;
 
       if (lead.inquiryType === 'service') {
         detailsHtml += `
-          <div class="field"><label>Service</label><div class="value">${lead.service || '-'}</div></div>
+          <div class="field"><label>Service Interest</label><div class="value">${lead.service || '-'}</div></div>
           <div class="field"><label>Budget</label><div class="value">${lead.budget || '-'}</div></div>
           <div class="field"><label>Timeline</label><div class="value">${lead.timeline || '-'}</div></div>
+          <div class="field full-width"><label>Challenge/Problem</label><div class="value">${lead.challenge || '-'}</div></div>
+          <div class="field"><label>Competitor</label><div class="value">${lead.competitor || '-'}</div></div>
+          <div class="field full-width"><label>Past Agency Experience</label><div class="value">${lead.pastExperience || '-'}</div></div>
+          <div class="field full-width"><label>Goals</label><div class="value">${lead.goals || '-'}</div></div>
         `;
       } else if (lead.inquiryType === 'job') {
         detailsHtml += `
           <div class="field"><label>Job Role</label><div class="value">${lead.jobRole || '-'}</div></div>
           <div class="field"><label>Experience</label><div class="value">${lead.experience || '-'}</div></div>
-          <div class="field"><label>Resume</label><div class="value">${lead.resumeLink ? `<a href="${lead.resumeLink}" target="_blank" style="color:#25D366;">📎 Download Resume</a>` : '-'}</div></div>
+          <div class="field"><label>Resume</label><div class="value">${lead.resumeLink ? `<a href="${lead.resumeLink}" target="_blank" style="color:#25D366;">Download Resume</a>` : '-'}</div></div>
         `;
+
+        // Show assessment answers
+        if (lead.assessmentAnswers && lead.assessmentAnswers.length > 0) {
+          detailsHtml += `<div class="field full-width"><label>Skill Assessment</label><div class="assessment-answers">`;
+          lead.assessmentAnswers.forEach((answer, idx) => {
+            detailsHtml += `<div class="qa"><div class="q">Q${idx + 1}</div><div class="a">${answer}</div></div>`;
+          });
+          detailsHtml += `</div></div>`;
+        }
       } else if (lead.inquiryType === 'networking') {
         detailsHtml += `
           <div class="field"><label>Connect With</label><div class="value">${lead.personToConnect || '-'}</div></div>
@@ -296,12 +331,12 @@
       }
 
       if (lead.notes) {
-        detailsHtml += `<div class="field" style="grid-column: 1/-1;"><label>Notes</label><div class="value">${lead.notes}</div></div>`;
+        detailsHtml += `<div class="field full-width"><label>Notes</label><div class="value">${lead.notes}</div></div>`;
       }
 
       // Show all attachments
       if (lead.attachments && lead.attachments.length > 0) {
-        detailsHtml += `<div class="field" style="grid-column: 1/-1;"><label>📎 Attachments (${lead.attachments.length})</label><div class="value">`;
+        detailsHtml += `<div class="field full-width"><label>Attachments (${lead.attachments.length})</label><div class="value">`;
         lead.attachments.forEach(att => {
           const icon = att.type === 'document' ? '📄' : (att.type === 'image' ? '🖼️' : '📁');
           detailsHtml += `<a href="${att.localPath}" target="_blank" style="display:inline-block; margin:5px 10px 5px 0; padding:8px 12px; background:#e8f5e9; border-radius:8px; color:#388e3c; text-decoration:none;">${icon} ${att.fileName || 'Download'}</a>`;
@@ -367,6 +402,66 @@
       await fetch('/api/leads/' + id, { method: 'DELETE' });
       await loadStats();
       loadLeads();
+    }
+
+    // Export to Excel
+    function exportToExcel() {
+      const typeFilter = document.getElementById('type-filter').value;
+      const statusFilter = document.getElementById('status-filter').value;
+
+      let filtered = allLeads;
+      if (typeFilter !== 'all') filtered = filtered.filter(l => l.inquiryType === typeFilter);
+      if (statusFilter !== 'all') filtered = filtered.filter(l => l.status === statusFilter);
+
+      // Prepare CSV data
+      const headers = [
+        'Type', 'Name', 'WhatsApp Name', 'Phone', 'Email', 'Company', 'Designation', 'Website',
+        'Service', 'Challenge', 'Competitor', 'Past Experience', 'Goals', 'Budget', 'Timeline',
+        'Job Role', 'Experience (Years)', 'Assessment Answers',
+        'Event Name', 'Person to Connect', 'Notes', 'Status', 'Created At'
+      ];
+
+      const rows = filtered.map(lead => [
+        lead.inquiryType || '',
+        lead.name || '',
+        lead.whatsappName || '',
+        lead.phoneNumber || '',
+        lead.email || '',
+        lead.company || '',
+        lead.designation || '',
+        lead.website || '',
+        lead.service || '',
+        lead.challenge || '',
+        lead.competitor || '',
+        lead.pastExperience || '',
+        lead.goals || '',
+        lead.budget || '',
+        lead.timeline || '',
+        lead.jobRole || '',
+        lead.experience || '',
+        (lead.assessmentAnswers || []).join(' | '),
+        lead.eventName || '',
+        lead.personToConnect || '',
+        lead.notes || '',
+        lead.status || '',
+        lead.createdAt ? new Date(lead.createdAt).toLocaleString() : ''
+      ]);
+
+      // Create CSV content
+      const csvContent = [headers, ...rows]
+        .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
+        .join('\n');
+
+      // Add BOM for Excel UTF-8 compatibility
+      const BOM = '\uFEFF';
+      const blob = new Blob([BOM + csvContent], { type: 'text/csv;charset=utf-8;' });
+
+      // Download
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = `ethinos_leads_${new Date().toISOString().split('T')[0]}.csv`;
+      link.click();
+      URL.revokeObjectURL(link.href);
     }
 
     // Event listeners
