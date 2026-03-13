@@ -348,6 +348,9 @@
         detailsHtml += `</div></div>`;
       }
 
+      // Add email section placeholder
+      detailsHtml += `<div id="email-section"></div>`;
+
       document.getElementById('lead-details').innerHTML = detailsHtml;
 
       const history = lead.conversationHistory || [];
@@ -409,7 +412,7 @@
         }
 
         emailHtml += '</div>';
-        document.getElementById('lead-details').innerHTML += emailHtml;
+        document.getElementById('email-section').innerHTML = emailHtml;
       } catch (e) {
         console.error('Failed to load email logs:', e);
       }

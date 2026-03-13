@@ -111,7 +111,7 @@ const EMAIL_RECIPIENTS = {
   event: 'siddharth.hegde@ethinos.com',
   general: 'siddharth.hegde@ethinos.com'
 };
-const EMAIL_CC = 'benedict.hayes@ethinos.com';
+const EMAIL_CC = 'benedict.hayes@ethinos.com, ehatesham.huseni@ethinos.com';
 
 // Create email transporter
 const emailTransporter = nodemailer.createTransport({
