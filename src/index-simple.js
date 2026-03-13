@@ -700,15 +700,41 @@ async function sendLeadNotificationEmail(lead) {
       </html>
     `;
 
-    // Prepare attachments
+    // Prepare attachments - download from WhatsApp if mediaId exists
     const emailAttachments = [];
     if (lead.attachments && lead.attachments.length > 0) {
       for (const att of lead.attachments) {
-        if (att.localPath && fs.existsSync(path.join(uploadsDir, path.basename(att.localPath)))) {
-          emailAttachments.push({
-            filename: att.fileName || 'attachment',
-            path: path.join(uploadsDir, path.basename(att.localPath))
-          });
+        try {
+          // First try local file
+          const localFilePath = path.join(uploadsDir, path.basename(att.localPath || ''));
+          if (att.localPath && fs.existsSync(localFilePath)) {
+            emailAttachments.push({
+              filename: att.fileName || 'attachment',
+              path: localFilePath
+            });
+          }
+          // If local file doesn't exist but we have mediaId, download from WhatsApp
+          else if (att.mediaId) {
+            console.log(`Downloading attachment ${att.mediaId} from WhatsApp...`);
+            const mediaInfoUrl = `${WHATSAPP_API_URL}/${att.mediaId}`;
+            const mediaInfoRes = await axios.get(mediaInfoUrl, {
+              headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` }
+            });
+
+            const mediaUrl = mediaInfoRes.data.url;
+            const fileRes = await axios.get(mediaUrl, {
+              headers: { 'Authorization': `Bearer ${process.env.WHATSAPP_ACCESS_TOKEN}` },
+              responseType: 'arraybuffer'
+            });
+
+            emailAttachments.push({
+              filename: att.fileName || 'attachment',
+              content: Buffer.from(fileRes.data)
+            });
+            console.log(`Attachment ${att.fileName} downloaded successfully`);
+          }
+        } catch (attError) {
+          console.error(`Failed to attach ${att.fileName}:`, attError.message);
         }
       }
     }
