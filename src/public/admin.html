@@ -364,6 +364,72 @@
       // Scroll conversation to bottom
       const conv = document.getElementById('conversation');
       conv.scrollTop = conv.scrollHeight;
+
+      // Load email logs
+      loadEmailLogs(id, lead.emailSent);
+    }
+
+    async function loadEmailLogs(leadId, emailSent) {
+      try {
+        const res = await fetch('/api/leads/' + leadId + '/emails');
+        const logs = await res.json();
+
+        let emailHtml = `
+          <div style="margin-top: 20px; padding: 15px; background: #f5f5f5; border-radius: 8px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+              <h4 style="margin: 0;">Email Notifications</h4>
+              <button onclick="resendEmail('${leadId}')" style="padding: 6px 12px; background: ${emailSent ? '#ff9800' : '#4CAF50'}; color: white; border: none; border-radius: 4px; cursor: pointer;">
+                ${emailSent ? 'Resend Email' : 'Send Email'}
+              </button>
+            </div>
+        `;
+
+        if (logs.length === 0) {
+          emailHtml += '<p style="color: #999; margin: 0;">No emails sent yet</p>';
+        } else {
+          emailHtml += '<div style="max-height: 150px; overflow-y: auto;">';
+          logs.forEach(log => {
+            const statusColor = log.status === 'sent' ? '#4CAF50' : '#f44336';
+            const statusIcon = log.status === 'sent' ? '✓' : '✗';
+            emailHtml += `
+              <div style="padding: 8px; margin: 5px 0; background: white; border-radius: 4px; border-left: 3px solid ${statusColor};">
+                <div style="display: flex; justify-content: space-between;">
+                  <span><strong>${statusIcon}</strong> To: ${log.toEmail}</span>
+                  <span style="color: #666; font-size: 12px;">${new Date(log.sentAt).toLocaleString()}</span>
+                </div>
+                <div style="font-size: 12px; color: #666; margin-top: 3px;">
+                  ${log.subject}
+                  ${log.ccEmail ? `<br>CC: ${log.ccEmail}` : ''}
+                  ${log.errorMessage ? `<br><span style="color: #f44336;">Error: ${log.errorMessage}</span>` : ''}
+                </div>
+              </div>
+            `;
+          });
+          emailHtml += '</div>';
+        }
+
+        emailHtml += '</div>';
+        document.getElementById('lead-details').innerHTML += emailHtml;
+      } catch (e) {
+        console.error('Failed to load email logs:', e);
+      }
+    }
+
+    async function resendEmail(leadId) {
+      if (!confirm('Send email notification for this lead?')) return;
+
+      try {
+        const res = await fetch('/api/leads/' + leadId + '/resend-email', { method: 'POST' });
+        const data = await res.json();
+        if (res.ok) {
+          alert('Email sent successfully!');
+          viewLead(leadId);
+        } else {
+          alert('Failed: ' + (data.error || 'Unknown error'));
+        }
+      } catch (e) {
+        alert('Failed to send email');
+      }
     }
 
     function closeModal() {

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const axios = require('axios');
 const OpenAI = require('openai');
+const nodemailer = require('nodemailer');
 const { Sequelize, DataTypes } = require('sequelize');
 const path = require('path');
 const fs = require('fs');
@@ -71,9 +72,27 @@ const Lead = sequelize.define('Lead', {
   attachments: { type: DataTypes.JSON, defaultValue: [] }, // Array of {mediaId, fileName, mimeType, localPath}
   notes: DataTypes.TEXT,
   status: { type: DataTypes.STRING, defaultValue: 'new' }, // new, in_progress, completed, contacted
-  conversationHistory: { type: DataTypes.JSON, defaultValue: [] }
+  conversationHistory: { type: DataTypes.JSON, defaultValue: [] },
+  emailSent: { type: DataTypes.BOOLEAN, defaultValue: false },
+  emailSentAt: DataTypes.DATE
 }, {
   tableName: 'leads',
+  timestamps: true
+});
+
+// Email Log Model
+const EmailLog = sequelize.define('EmailLog', {
+  id: { type: DataTypes.UUID, defaultValue: DataTypes.UUIDV4, primaryKey: true },
+  leadId: { type: DataTypes.UUID, allowNull: false },
+  toEmail: DataTypes.STRING,
+  ccEmail: DataTypes.STRING,
+  subject: DataTypes.STRING,
+  inquiryType: DataTypes.STRING,
+  status: { type: DataTypes.STRING, defaultValue: 'sent' }, // sent, failed
+  errorMessage: DataTypes.TEXT,
+  sentAt: { type: DataTypes.DATE, defaultValue: DataTypes.NOW }
+}, {
+  tableName: 'email_logs',
   timestamps: true
 });
 
@@ -82,6 +101,27 @@ sequelize.sync({ alter: true }).then(() => {
   console.log('PostgreSQL connected & synced');
 }).catch(err => {
   console.error('Database error:', err);
+});
+
+// Email Configuration
+const EMAIL_RECIPIENTS = {
+  job: 'sakshi.bichave@ethinos.com',
+  service: 'siddharth.hegde@ethinos.com',
+  networking: 'siddharth.hegde@ethinos.com',
+  event: 'siddharth.hegde@ethinos.com',
+  general: 'siddharth.hegde@ethinos.com'
+};
+const EMAIL_CC = 'benedict.hayes@ethinos.com';
+
+// Create email transporter
+const emailTransporter = nodemailer.createTransport({
+  host: process.env.SMTP_HOST || 'smtp-mail.outlook.com',
+  port: parseInt(process.env.SMTP_PORT) || 587,
+  secure: false,
+  auth: {
+    user: process.env.SMTP_USER,
+    pass: process.env.SMTP_PASS
+  }
 });
 
 const openai = new OpenAI({
@@ -466,6 +506,14 @@ app.post('/webhook', async (req, res) => {
 
     await lead.update(updates);
 
+    // Send email notification when lead is completed (and not already sent)
+    if (isComplete && !lead.emailSent) {
+      const refreshedLead = await Lead.findByPk(lead.id);
+      sendLeadNotificationEmail(refreshedLead).catch(err => {
+        console.error('Email send error:', err);
+      });
+    }
+
     // Send WhatsApp message
     await sendWhatsAppMessage(from, cleanResponse);
 
@@ -540,6 +588,175 @@ function parseAIResponse(response) {
   }
 
   return { cleanResponse, leadData };
+}
+
+// Send email notification to team head
+async function sendLeadNotificationEmail(lead) {
+  try {
+    const type = lead.inquiryType || 'general';
+    const toEmail = EMAIL_RECIPIENTS[type] || EMAIL_RECIPIENTS.general;
+
+    // Build conversation HTML
+    const conversationHtml = (lead.conversationHistory || []).map(msg => {
+      const isUser = msg.role === 'user';
+      return `
+        <div style="margin: 10px 0; padding: 10px; background: ${isUser ? '#DCF8C6' : '#E8E8E8'}; border-radius: 8px; max-width: 80%; ${isUser ? 'margin-left: auto;' : ''}">
+          <strong>${isUser ? (lead.name || lead.whatsappName || 'User') : 'Ethinos Bot'}:</strong><br>
+          ${msg.content}
+          <div style="font-size: 11px; color: #666; margin-top: 5px;">${new Date(msg.timestamp).toLocaleString()}</div>
+        </div>
+      `;
+    }).join('');
+
+    // Build details section based on inquiry type
+    let detailsHtml = `
+      <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Name</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.name || lead.whatsappName || '-'}</td></tr>
+      <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Phone</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.phoneNumber}</td></tr>
+      <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Email</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.email || '-'}</td></tr>
+      <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Company</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.company || '-'}</td></tr>
+      <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Designation</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.designation || '-'}</td></tr>
+    `;
+
+    if (type === 'job') {
+      detailsHtml += `
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Job Role</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.jobRole || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Total Experience</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.totalExperience || lead.experience || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Relevant Experience</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.relevantExperience || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Current CTC</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.currentCTC || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Expected CTC</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.expectedCTC || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Notice Period</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.noticePeriod || '-'}</td></tr>
+      `;
+
+      // Add assessment Q&A
+      if (lead.assessmentQA && lead.assessmentQA.length > 0) {
+        const qaHtml = lead.assessmentQA.map((qa, i) => `<p><strong>Q${i+1}:</strong> ${qa.q}<br><strong>A:</strong> ${qa.a}</p>`).join('');
+        detailsHtml += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Skill Assessment</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${qaHtml}</td></tr>`;
+      }
+    } else if (type === 'service') {
+      detailsHtml += `
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Website</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.website || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Service Interest</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.service || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Challenge</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.challenge || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Competitor</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.competitor || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Past Experience</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.pastExperience || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Goals</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.goals || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Budget</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.budget || '-'}</td></tr>
+        <tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Timeline</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.timeline || '-'}</td></tr>
+      `;
+    } else if (type === 'networking') {
+      detailsHtml += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Person to Connect</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.personToConnect || '-'}</td></tr>`;
+    } else if (type === 'event') {
+      detailsHtml += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Event Name</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.eventName || '-'}</td></tr>`;
+    }
+
+    if (lead.notes) {
+      detailsHtml += `<tr><td style="padding: 8px; border: 1px solid #ddd;"><strong>Notes</strong></td><td style="padding: 8px; border: 1px solid #ddd;">${lead.notes}</td></tr>`;
+    }
+
+    // Email subject
+    const subjectMap = {
+      job: `New Job Application: ${lead.jobRole || 'General'} - ${lead.name || lead.whatsappName}`,
+      service: `New Service Inquiry: ${lead.company || lead.name || lead.whatsappName}`,
+      networking: `Networking Request: ${lead.name || lead.whatsappName}`,
+      event: `Event Contact: ${lead.eventName || 'Unknown'} - ${lead.name || lead.whatsappName}`,
+      general: `New WhatsApp Inquiry: ${lead.name || lead.whatsappName}`
+    };
+    const subject = subjectMap[type] || subjectMap.general;
+
+    // Email HTML body
+    const htmlBody = `
+      <!DOCTYPE html>
+      <html>
+      <head><meta charset="utf-8"></head>
+      <body style="font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px;">
+        <div style="background: linear-gradient(135deg, #25D366, #128C7E); color: white; padding: 20px; border-radius: 8px 8px 0 0;">
+          <h2 style="margin: 0;">New ${type.charAt(0).toUpperCase() + type.slice(1)} Inquiry</h2>
+          <p style="margin: 5px 0 0 0; opacity: 0.9;">Via WhatsApp Bot - ${new Date().toLocaleString()}</p>
+        </div>
+
+        <div style="border: 1px solid #ddd; border-top: none; padding: 20px; border-radius: 0 0 8px 8px;">
+          <h3 style="color: #333; border-bottom: 2px solid #25D366; padding-bottom: 10px;">Lead Details</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            ${detailsHtml}
+          </table>
+
+          <h3 style="color: #333; border-bottom: 2px solid #25D366; padding-bottom: 10px; margin-top: 30px;">Conversation History</h3>
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; max-height: 500px; overflow-y: auto;">
+            ${conversationHtml || '<p style="color: #666;">No conversation recorded</p>'}
+          </div>
+
+          <div style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 8px;">
+            <p style="margin: 0; color: #2e7d32;">
+              <strong>Quick Actions:</strong> Reply to the candidate at <a href="mailto:${lead.email}">${lead.email}</a>
+              or call <a href="tel:${lead.phoneNumber}">${lead.phoneNumber}</a>
+            </p>
+          </div>
+        </div>
+
+        <p style="color: #999; font-size: 12px; text-align: center; margin-top: 20px;">
+          This is an automated notification from Ethinos WhatsApp Lead Bot
+        </p>
+      </body>
+      </html>
+    `;
+
+    // Prepare attachments
+    const emailAttachments = [];
+    if (lead.attachments && lead.attachments.length > 0) {
+      for (const att of lead.attachments) {
+        if (att.localPath && fs.existsSync(path.join(uploadsDir, path.basename(att.localPath)))) {
+          emailAttachments.push({
+            filename: att.fileName || 'attachment',
+            path: path.join(uploadsDir, path.basename(att.localPath))
+          });
+        }
+      }
+    }
+
+    // Send email
+    const mailOptions = {
+      from: `"${process.env.SMTP_FROM_NAME || 'Ethinos Notifications'}" <${process.env.SMTP_FROM || process.env.SMTP_USER}>`,
+      to: toEmail,
+      cc: EMAIL_CC,
+      subject: subject,
+      html: htmlBody,
+      attachments: emailAttachments
+    };
+
+    await emailTransporter.sendMail(mailOptions);
+
+    // Log email
+    await EmailLog.create({
+      leadId: lead.id,
+      toEmail: toEmail,
+      ccEmail: EMAIL_CC,
+      subject: subject,
+      inquiryType: type,
+      status: 'sent'
+    });
+
+    // Update lead
+    await lead.update({ emailSent: true, emailSentAt: new Date() });
+
+    console.log(`Email sent for lead ${lead.id} to ${toEmail}`);
+    return true;
+
+  } catch (error) {
+    console.error('Email send error:', error);
+
+    // Log failed email
+    await EmailLog.create({
+      leadId: lead.id,
+      toEmail: EMAIL_RECIPIENTS[lead.inquiryType] || EMAIL_RECIPIENTS.general,
+      ccEmail: EMAIL_CC,
+      subject: `Lead notification - ${lead.name || lead.phoneNumber}`,
+      inquiryType: lead.inquiryType || 'general',
+      status: 'failed',
+      errorMessage: error.message
+    });
+
+    return false;
+  }
 }
 
 // Download media from WhatsApp
@@ -762,6 +979,52 @@ app.post('/api/leads/:id/message', basicAuth, async (req, res) => {
     await lead.update({ conversationHistory: history });
 
     res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get email logs for a lead
+app.get('/api/leads/:id/emails', basicAuth, async (req, res) => {
+  try {
+    const emails = await EmailLog.findAll({
+      where: { leadId: req.params.id },
+      order: [['sentAt', 'DESC']]
+    });
+    res.json(emails);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Resend email for a lead
+app.post('/api/leads/:id/resend-email', basicAuth, async (req, res) => {
+  try {
+    const lead = await Lead.findByPk(req.params.id);
+    if (!lead) return res.status(404).json({ error: 'Lead not found' });
+
+    // Reset email sent flag and resend
+    await lead.update({ emailSent: false });
+    const success = await sendLeadNotificationEmail(lead);
+
+    if (success) {
+      res.json({ success: true, message: 'Email sent successfully' });
+    } else {
+      res.status(500).json({ error: 'Failed to send email' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all email logs
+app.get('/api/email-logs', basicAuth, async (req, res) => {
+  try {
+    const logs = await EmailLog.findAll({
+      order: [['sentAt', 'DESC']],
+      limit: 100
+    });
+    res.json(logs);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
